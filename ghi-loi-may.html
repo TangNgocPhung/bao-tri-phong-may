@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ghi lỗi máy tính · Thống kê lỗi phòng máy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Be+Vietnam+Pro:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  :root {
+    --bg: #eef2ed;
+    --surface: #fff;
+    --surface-2: #f7f8f4;
+    --ink: #232823;
+    --muted: #687067;
+    --border: #d7ddd1;
+    --blue: #34618f;
+    --green: #256f69;
+    --green-soft: #e5f2ef;
+    --orange: #a95b28;
+    --red: #b3382c;
+    --red-soft: #f8e4e1;
+    --shadow: 0 18px 50px -30px rgba(30, 45, 38, .45);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #191d1b;
+      --surface: #222724;
+      --surface-2: #1d221f;
+      --ink: #e8ece7;
+      --muted: #9aa398;
+      --border: #38403a;
+      --blue: #82b2e1;
+      --green: #6fd1c6;
+      --green-soft: #1f3330;
+      --orange: #e39c61;
+      --red: #f08a7e;
+      --red-soft: #3b2420;
+      --shadow: 0 18px 50px -30px rgba(0, 0, 0, .8);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Be Vietnam Pro", "Segoe UI", sans-serif;
+  }
+  [hidden] { display: none !important; }
+  .topbar {
+    border-top: 5px solid var(--green);
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    backdrop-filter: blur(12px);
+  }
+  .topbar-inner {
+    width: min(1100px, 100%);
+    margin: auto;
+    padding: .9rem clamp(1rem, 4vw, 2rem);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .8rem;
+    flex-wrap: wrap;
+  }
+  .brand {
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    text-decoration: none;
+    color: var(--orange);
+  }
+  .nav { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+  .pill {
+    font: inherit;
+    font-size: .82rem;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    color: var(--green);
+    background: transparent;
+    padding: .5rem .85rem;
+    border: 1px solid var(--green);
+    border-radius: 999px;
+  }
+  .who { font-size: .84rem; color: var(--muted); }
+  .who b { color: var(--ink); }
+  .page {
+    width: min(1100px, 100%);
+    margin: auto;
+    padding: clamp(1.5rem, 4vw, 3rem) clamp(1rem, 4vw, 2rem) 4rem;
+  }
+  .eyebrow {
+    display: block;
+    font-family: "IBM Plex Mono", Consolas, monospace;
+    font-weight: 600;
+    letter-spacing: .1em;
+    color: var(--green);
+    font-size: .72rem;
+    margin-bottom: .65rem;
+  }
+  h1 {
+    margin: 0 0 .55rem;
+    font-family: "Fraunces", Georgia, serif;
+    font-size: clamp(1.9rem, 5vw, 2.8rem);
+    line-height: 1.05;
+  }
+  h2 { margin: 0 0 1rem; font-family: "Fraunces", Georgia, serif; font-size: 1.4rem; }
+  .lede { margin: 0 0 1.6rem; color: var(--muted); line-height: 1.6; }
+  .card {
+    margin-bottom: 1.6rem;
+    padding: clamp(1rem, 3vw, 1.6rem);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+  .card--narrow { max-width: 28rem; }
+  form { display: grid; gap: 1rem; }
+  .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); }
+  label { display: grid; gap: .35rem; font-size: .82rem; font-weight: 600; }
+  input, select, textarea {
+    font: inherit;
+    font-weight: 400;
+    color: var(--ink);
+    padding: .6rem .75rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-2);
+    width: 100%;
+  }
+  textarea { min-height: 5.5rem; resize: vertical; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible, .pill:focus-visible, .btn:focus-visible {
+    outline: 2px solid var(--green);
+    outline-offset: 2px;
+  }
+  .btn {
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    justify-self: start;
+    padding: .7rem 1.4rem;
+    border: 0;
+    border-radius: 999px;
+    background: var(--green);
+    color: #fff;
+  }
+  @media (prefers-color-scheme: dark) { .btn { color: #10201e; } }
+  .btn:disabled { opacity: .6; cursor: wait; }
+  .msg { margin: 0; padding: .6rem .85rem; border-radius: 10px; font-size: .86rem; }
+  .msg--err { background: var(--red-soft); color: var(--red); }
+  .msg--ok { background: var(--green-soft); color: var(--green); }
+
+  .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .toolbar h2 { margin: 0; }
+  .toolbar select { width: auto; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+  th, td { text-align: left; padding: .6rem .7rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  td.mono { font-family: "IBM Plex Mono", Consolas, monospace; font-weight: 600; white-space: nowrap; }
+  .kpis { display: grid; gap: .8rem; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); margin-bottom: 1.4rem; }
+  .kpi { padding: .8rem 1rem; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); display: grid; gap: .15rem; }
+  .kpi-num { font-family: "Fraunces", Georgia, serif; font-size: 1.7rem; font-weight: 700; color: var(--orange); }
+  .kpi-label { font-size: .78rem; color: var(--muted); }
+  .stat-cols { display: grid; gap: 1.6rem; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); }
+  h3 { margin: 0 0 .7rem; font-size: .9rem; color: var(--blue); }
+  .bars { display: grid; gap: .5rem; }
+  .bar { display: grid; grid-template-columns: 8.5rem 1fr 2rem; align-items: center; gap: .6rem; font-size: .82rem; }
+  .bar-track { height: .7rem; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--green); border-radius: 999px; }
+  .bar-count { font-family: "IBM Plex Mono", Consolas, monospace; font-weight: 600; text-align: right; }
+  .badge { display: inline-block; padding: .15rem .6rem; border-radius: 999px; font-size: .74rem; font-weight: 700; white-space: nowrap; background: var(--red-soft); color: var(--red); }
+  .badge--done { background: var(--green-soft); color: var(--green); }
+  tr.is-done td:not(:last-child):not(:nth-last-child(2)) { color: var(--muted); }
+  .by { margin-top: .3rem; font-size: .76rem; color: var(--muted); }
+  .actions { display: flex; gap: .4rem; flex-wrap: wrap; }
+  .mini { font: inherit; font-size: .76rem; font-weight: 700; cursor: pointer; padding: .3rem .7rem; border-radius: 999px; border: 1px solid var(--green); background: transparent; color: var(--green); white-space: nowrap; }
+  .mini--del { border-color: var(--red); color: var(--red); }
+  .mini:disabled { opacity: .5; cursor: wait; }
+  .empty { color: var(--muted); font-size: .9rem; margin: 0; }
+  .warn { margin-top: 0; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="so-do-phong-may.html">Thống kê lỗi phòng máy</a>
+    <div class="nav">
+      <span class="who" id="who" hidden>Xin chào, <b id="who-name"></b></span>
+      <a class="pill" href="so-do-phong-may.html">Sơ đồ phòng máy</a>
+      <button class="pill" id="logout" type="button" hidden>Đăng xuất</button>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+  <span class="eyebrow">GHI NHẬN MÁY HƯ</span>
+  <h1>Ghi lỗi máy tính</h1>
+  <p class="lede">Giáo viên đăng nhập bằng tài khoản được cấp, sau đó điền thông tin máy bị hư để nhà trường theo dõi và sửa chữa.</p>
+
+  <p class="msg msg--err warn" id="no-config" hidden>Chưa cấu hình máy chủ: hãy dán URL Apps Script vào <code>data/cau-hinh.js</code> (xem hướng dẫn trong <code>apps-script/Code.gs</code>).</p>
+
+  <section class="card card--narrow" id="login-card">
+    <h2>Đăng nhập giáo viên</h2>
+    <form id="login-form">
+      <label>Tài khoản
+        <input id="tai-khoan" autocomplete="username" required>
+      </label>
+      <label>Mật khẩu
+        <input id="mat-khau" type="password" autocomplete="current-password" required>
+      </label>
+      <p class="msg msg--err" id="login-error" hidden></p>
+      <button class="btn" type="submit">Đăng nhập</button>
+    </form>
+  </section>
+
+  <div id="app" hidden>
+    <section class="card">
+      <h2>Thông tin máy hư</h2>
+      <form id="loi-form">
+        <div class="grid">
+          <label>Phòng máy
+            <select id="phong" required></select>
+          </label>
+          <label>Máy tính
+            <select id="may" required></select>
+          </label>
+          <label>Ngày
+            <input id="ngay" type="date" required>
+          </label>
+          <label>Giáo viên ghi nhận
+            <select id="giao-vien" required></select>
+          </label>
+        </div>
+        <label>Lỗi bị hư
+          <textarea id="loi" maxlength="500" placeholder="Ví dụ: không lên nguồn, hỏng bàn phím, mất kết nối mạng…" required></textarea>
+        </label>
+        <p class="msg" id="form-msg" hidden></p>
+        <button class="btn" id="submit" type="submit">Ghi lỗi</button>
+      </form>
+    </section>
+
+    <section class="card" id="stats">
+      <h2>Thống kê máy hư</h2>
+      <div class="kpis">
+        <div class="kpi"><span class="kpi-num" id="kpi-total">0</span><span class="kpi-label">lượt báo lỗi</span></div>
+        <div class="kpi"><span class="kpi-num" id="kpi-machines">0</span><span class="kpi-label">lỗi chưa xử lý</span></div>
+        <div class="kpi"><span class="kpi-num" id="kpi-room">—</span><span class="kpi-label">phòng nhiều lỗi nhất</span></div>
+      </div>
+      <div class="stat-cols">
+        <div>
+          <h3>Lỗi theo phòng</h3>
+          <div class="bars" id="bars-room"></div>
+        </div>
+        <div>
+          <h3>Máy hư nhiều nhất</h3>
+          <div class="bars" id="bars-machine"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="toolbar">
+        <h2>Lỗi đã ghi nhận</h2>
+        <select id="loc-phong" aria-label="Lọc theo phòng"></select>
+      </div>
+      <div class="table-wrap">
+        <table id="bang" hidden>
+          <thead><tr><th>Ngày</th><th>Phòng</th><th>Máy</th><th>Lỗi</th><th>Giáo viên</th><th>Trạng thái</th><th></th></tr></thead>
+          <tbody id="bang-body"></tbody>
+        </table>
+      </div>
+      <p class="empty" id="bang-empty">Đang tải…</p>
+    </section>
+  </div>
+</main>
+
+<script src="data/phong-may.js?v=5"></script>
+<script src="data/cau-hinh.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var API_URL = (window.CAU_HINH && window.CAU_HINH.API_URL) || "";
+  var ROOMS = window.PHONG_MAY.rooms;
+  var KEY = "loiMayPhien";
+  // Phải khớp danh sách GIAO_VIEN trong apps-script/Code.gs
+  var TEACHERS = [
+    "Bùi Thị Thanh Nhàn",
+    "Đỗ Như Hảo",
+    "Nguyễn Thị Kim Ngân",
+    "Võ Thị Châu Tiền",
+    "Cao Hoàng Thiên Ý",
+    "Nguyễn Thị Kim Phung",
+    "Tăng Ngọc Phụng",
+    "Nguyễn Thanh Hiền"
+  ];
+
+  var $ = function (id) { return document.getElementById(id); };
+  var session = null; // { token, hoTen }
+  var items = [];
+
+  function loadSession() {
+    try { return JSON.parse(sessionStorage.getItem(KEY)); } catch (e) { return null; }
+  }
+  function saveSession(value) {
+    try {
+      if (value) sessionStorage.setItem(KEY, JSON.stringify(value));
+      else sessionStorage.removeItem(KEY);
+    } catch (e) { /* bỏ qua nếu trình duyệt chặn lưu trữ */ }
+  }
+
+  function api(payload) {
+    // text/plain tránh preflight CORS mà Apps Script không hỗ trợ.
+    return fetch(API_URL, { method: "POST", body: JSON.stringify(payload) })
+      .then(function (res) { return res.json(); })
+      .catch(function () { return { ok: false, error: "Không kết nối được máy chủ. Hãy thử lại." }; });
+  }
+
+  function show(el, text, kind) {
+    el.hidden = !text;
+    el.textContent = text || "";
+    if (kind) el.className = "msg " + kind;
+  }
+
+  function pad(n) { return n < 10 ? "0" + n : String(n); }
+
+  function today() {
+    var d = new Date();
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+
+  function formatDate(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+    return m ? m[3] + "/" + m[2] + "/" + m[1] : iso;
+  }
+
+  function roomName(id) {
+    var room = window.PHONG_MAY.byId(id);
+    return room ? room.name : id;
+  }
+
+  function option(value, label) {
+    var o = document.createElement("option");
+    o.value = value;
+    o.textContent = label;
+    return o;
+  }
+
+  function fillSeats() {
+    var room = window.PHONG_MAY.byId($("phong").value);
+    var select = $("may");
+    select.innerHTML = "";
+    var total = room ? window.PHONG_MAY.totalSeats(room) : 0;
+    for (var n = 1; n <= total; n += 1) select.appendChild(option(n, "Máy " + pad(n)));
+  }
+
+  function initForm() {
+    ROOMS.forEach(function (room) {
+      $("phong").appendChild(option(room.id, room.name + (room.alias ? " — " + room.alias : "")));
+    });
+    $("loc-phong").appendChild(option("", "Tất cả phòng"));
+    ROOMS.forEach(function (room) { $("loc-phong").appendChild(option(room.id, room.name)); });
+    $("giao-vien").appendChild(option("", "— Chọn giáo viên —"));
+    TEACHERS.forEach(function (name) { $("giao-vien").appendChild(option(name, name)); });
+    $("ngay").value = today();
+    fillSeats();
+  }
+
+  function renderTable() {
+    var filter = $("loc-phong").value;
+    var rows = items.filter(function (it) { return !filter || it.phong === filter; });
+    var body = $("bang-body");
+    body.innerHTML = "";
+    rows.forEach(function (it) {
+      var tr = document.createElement("tr");
+      if (it.xong) tr.className = "is-done";
+      [formatDate(it.ngay), roomName(it.phong), pad(Number(it.may)), it.loi, it.giaoVien].forEach(function (text, i) {
+        var td = document.createElement("td");
+        if (i === 0 || i === 2) td.className = "mono";
+        td.textContent = text; // textContent: không chèn HTML từ dữ liệu người dùng
+        tr.appendChild(td);
+      });
+
+      var statusCell = document.createElement("td");
+      var badge = document.createElement("span");
+      badge.className = it.xong ? "badge badge--done" : "badge";
+      badge.textContent = it.xong ? "Đã xong" : "Chưa xử lý";
+      statusCell.appendChild(badge);
+      if (it.xong && it.nguoiXong) {
+        var by = document.createElement("div");
+        by.className = "by";
+        by.textContent = "Người xử lý: " + it.nguoiXong;
+        statusCell.appendChild(by);
+      }
+      tr.appendChild(statusCell);
+
+      var actionCell = document.createElement("td");
+      var actions = document.createElement("div");
+      actions.className = "actions";
+      actions.appendChild(actionButton(it.xong ? "Mở lại" : "Đã giải quyết xong", "", function () {
+        return api({ action: "resolve", token: session.token, id: it.id, xong: !it.xong });
+      }));
+      if (it.coQuyenXoa) {
+        actions.appendChild(actionButton("Xóa", "mini--del", function () {
+          if (!window.confirm("Xóa lỗi máy " + pad(Number(it.may)) + " — " + roomName(it.phong) + "? Thao tác này không hoàn tác được.")) return null;
+          return api({ action: "delete", token: session.token, id: it.id });
+        }));
+      }
+      actionCell.appendChild(actions);
+      tr.appendChild(actionCell);
+      body.appendChild(tr);
+    });
+    $("bang").hidden = !rows.length;
+    $("bang-empty").hidden = !!rows.length;
+    $("bang-empty").textContent = "Chưa có lỗi nào được ghi nhận.";
+  }
+
+  function renderBars(container, entries) {
+    container.innerHTML = "";
+    if (!entries.length) {
+      var none = document.createElement("p");
+      none.className = "empty";
+      none.textContent = "Chưa có dữ liệu.";
+      container.appendChild(none);
+      return;
+    }
+    var max = entries[0].count;
+    entries.forEach(function (entry) {
+      var row = document.createElement("div");
+      row.className = "bar";
+      var label = document.createElement("span");
+      label.textContent = entry.label;
+      var track = document.createElement("span");
+      track.className = "bar-track";
+      var fill = document.createElement("span");
+      fill.className = "bar-fill";
+      fill.style.display = "block";
+      fill.style.width = Math.round(entry.count / max * 100) + "%";
+      track.appendChild(fill);
+      var count = document.createElement("span");
+      count.className = "bar-count";
+      count.textContent = entry.count;
+      row.appendChild(label);
+      row.appendChild(track);
+      row.appendChild(count);
+      container.appendChild(row);
+    });
+  }
+
+  function sortedEntries(map, labeler) {
+    return Object.keys(map).map(function (key) {
+      return { key: key, label: labeler(key), count: map[key] };
+    }).sort(function (a, b) { return b.count - a.count; });
+  }
+
+  function renderStats() {
+    var byRoom = {};
+    var byMachine = {};
+    items.forEach(function (it) {
+      byRoom[it.phong] = (byRoom[it.phong] || 0) + 1;
+      var key = it.phong + "|" + pad(Number(it.may));
+      byMachine[key] = (byMachine[key] || 0) + 1;
+    });
+    var rooms = sortedEntries(byRoom, roomName);
+    var machines = sortedEntries(byMachine, function (key) {
+      var parts = key.split("|");
+      return "Máy " + parts[1] + " · " + roomName(parts[0]);
+    });
+    $("kpi-total").textContent = items.length;
+    $("kpi-machines").textContent = items.filter(function (it) { return !it.xong; }).length;
+    $("kpi-room").textContent = rooms.length ? rooms[0].label : "—";
+    renderBars($("bars-room"), rooms);
+    renderBars($("bars-machine"), machines.slice(0, 10));
+  }
+
+  function actionButton(label, extraClass, run) {
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "mini " + extraClass;
+    button.textContent = label;
+    button.addEventListener("click", function () {
+      var request = run();
+      if (!request) return;
+      button.disabled = true;
+      request.then(function (res) {
+        if (res.expired) return logout(true);
+        if (!res.ok) {
+          button.disabled = false;
+          window.alert(res.error);
+          return;
+        }
+        loadList();
+      });
+    });
+    return button;
+  }
+
+  function loadList() {
+    $("bang-empty").hidden = false;
+    $("bang-empty").textContent = "Đang tải…";
+    api({ action: "list", token: session.token }).then(function (res) {
+      if (res.expired) return logout(true);
+      if (!res.ok) { $("bang").hidden = true; $("bang-empty").textContent = res.error; return; }
+      items = res.items;
+      renderStats();
+      renderTable();
+    });
+  }
+
+  function enter() {
+    $("login-card").hidden = true;
+    $("app").hidden = false;
+    $("who").hidden = false;
+    $("logout").hidden = false;
+    $("who-name").textContent = session.hoTen;
+    // Tự chọn giáo viên đang đăng nhập nếu tên có trong danh sách
+    $("giao-vien").value = TEACHERS.indexOf(session.hoTen) >= 0 ? session.hoTen : "";
+    loadList();
+  }
+
+  function logout(expired) {
+    if (session && !expired) api({ action: "logout", token: session.token });
+    session = null;
+    saveSession(null);
+    $("app").hidden = true;
+    $("who").hidden = true;
+    $("logout").hidden = true;
+    $("login-card").hidden = false;
+    $("mat-khau").value = "";
+    show($("login-error"), expired ? "Phiên đăng nhập đã hết hạn, hãy đăng nhập lại." : "", "msg msg--err");
+  }
+
+  $("login-form").addEventListener("submit", function (event) {
+    event.preventDefault();
+    var button = event.target.querySelector("button");
+    button.disabled = true;
+    show($("login-error"), "");
+    api({ action: "login", taiKhoan: $("tai-khoan").value, matKhau: $("mat-khau").value }).then(function (res) {
+      button.disabled = false;
+      if (!res.ok) return show($("login-error"), res.error, "msg msg--err");
+      session = { token: res.token, hoTen: res.hoTen };
+      saveSession(session);
+      $("mat-khau").value = "";
+      enter();
+    });
+  });
+
+  $("loi-form").addEventListener("submit", function (event) {
+    event.preventDefault();
+    var button = $("submit");
+    button.disabled = true;
+    show($("form-msg"), "");
+    api({
+      action: "submit",
+      token: session.token,
+      phong: $("phong").value,
+      may: $("may").value,
+      loi: $("loi").value,
+      ngay: $("ngay").value,
+      giaoVien: $("giao-vien").value
+    }).then(function (res) {
+      button.disabled = false;
+      if (res.expired) return logout(true);
+      if (!res.ok) return show($("form-msg"), res.error, "msg msg--err");
+      show($("form-msg"), "Đã ghi nhận lỗi máy " + pad(Number($("may").value)) + " — " + roomName($("phong").value) + ".", "msg msg--ok");
+      $("loi").value = "";
+      loadList();
+    });
+  });
+
+  $("phong").addEventListener("change", fillSeats);
+  $("loc-phong").addEventListener("change", renderTable);
+  $("logout").addEventListener("click", function () { logout(false); });
+
+  initForm();
+  if (!API_URL) {
+    $("no-config").hidden = false;
+    $("login-form").querySelector("button").disabled = true;
+  } else {
+    session = loadSession();
+    if (session && session.token) enter();
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sơ đồ phòng máy tính · Thống kê lỗi phòng máy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Be+Vietnam+Pro:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  :root {
+    --bg: #eef2ed;
+    --surface: #fff;
+    --surface-2: #f7f8f4;
+    --ink: #232823;
+    --muted: #687067;
+    --border: #d7ddd1;
+    --blue: #34618f;
+    --blue-soft: #e7eef6;
+    --green: #256f69;
+    --green-soft: #e5f2ef;
+    --orange: #a95b28;
+    --orange-soft: #f8e9de;
+    --shadow: 0 18px 50px -30px rgba(30, 45, 38, .45);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #191d1b;
+      --surface: #222724;
+      --surface-2: #1d221f;
+      --ink: #e8ece7;
+      --muted: #9aa398;
+      --border: #38403a;
+      --blue: #82b2e1;
+      --blue-soft: #24313d;
+      --green: #6fd1c6;
+      --green-soft: #1f3330;
+      --orange: #e39c61;
+      --orange-soft: #3a2c20;
+      --shadow: 0 18px 50px -30px rgba(0, 0, 0, .8);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Be Vietnam Pro", "Segoe UI", sans-serif;
+  }
+  a { color: inherit; }
+  .topbar {
+    border-top: 5px solid var(--green);
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    backdrop-filter: blur(12px);
+  }
+  .topbar-inner {
+    width: min(1240px, 100%);
+    margin: auto;
+    padding: .9rem clamp(1rem, 4vw, 2rem);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .brand {
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    text-decoration: none;
+    color: var(--orange);
+  }
+  .back-link {
+    text-decoration: none;
+    color: var(--green);
+    font-size: .82rem;
+    font-weight: 700;
+    padding: .55rem .8rem;
+    border: 1px solid var(--green);
+    border-radius: 999px;
+  }
+  .page {
+    width: min(1240px, 100%);
+    margin: auto;
+    padding: clamp(1.5rem, 4vw, 3rem) clamp(1rem, 4vw, 2rem) 4rem;
+  }
+  .eyebrow {
+    display: block;
+    font-family: "IBM Plex Mono", Consolas, monospace;
+    font-weight: 600;
+    letter-spacing: .1em;
+    color: var(--green);
+    font-size: .72rem;
+    margin-bottom: .65rem;
+  }
+  h1 {
+    margin: 0 0 .55rem;
+    font-family: "Fraunces", Georgia, serif;
+    font-size: clamp(2rem, 5vw, 3.1rem);
+    line-height: 1.05;
+  }
+  .lede { margin: 0; max-width: 72ch; color: var(--muted); line-height: 1.6; }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .6rem 1.2rem;
+    margin: 1.6rem 0 2rem;
+    padding: .9rem 1.1rem;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+    font-size: .82rem;
+    color: var(--muted);
+  }
+  .legend b { color: var(--ink); }
+  .swatch {
+    display: inline-block;
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    vertical-align: -.25rem;
+    margin-right: .35rem;
+  }
+  .swatch--seat { background: var(--surface-2); }
+  .swatch--first { background: var(--green-soft); border-color: var(--green); }
+  .swatch--board { background: var(--blue-soft); border-color: var(--blue); }
+  .swatch--desk { background: var(--orange-soft); border-color: var(--orange); }
+  .swatch--door { background: var(--green-soft); border: 1px dashed var(--green); }
+
+  .room-card {
+    margin-bottom: 2rem;
+    padding: clamp(1rem, 3vw, 1.6rem);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+  .room-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .5rem 1rem;
+    margin-bottom: .35rem;
+  }
+  .room-head h2 {
+    margin: 0;
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 1.5rem;
+  }
+  .room-meta {
+    font-family: "IBM Plex Mono", Consolas, monospace;
+    font-size: .74rem;
+    letter-spacing: .08em;
+    color: var(--green);
+    font-weight: 600;
+  }
+  .room-note { margin: 0 0 .7rem; font-size: .85rem; color: var(--muted); line-height: 1.55; }
+  .room-location {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    margin: 0 0 1.1rem;
+    padding: .4rem .75rem;
+    border: 1px solid color-mix(in srgb, var(--green) 40%, var(--border));
+    border-radius: 999px;
+    background: var(--green-soft);
+    color: var(--green);
+    font-size: .78rem;
+    font-weight: 600;
+  }
+
+  .room { display: flex; gap: .7rem; align-items: stretch; }
+  .floor {
+    flex: 1;
+    min-width: 0;
+    padding: .9rem;
+    border: 2px dashed var(--border);
+    border-radius: 14px;
+    background: var(--surface-2);
+  }
+  .cols { display: grid; gap: .55rem; }
+  .col { min-width: 0; }
+  .col-label {
+    margin: 0 0 .45rem;
+    text-align: center;
+    font-family: "Fraunces", Georgia, serif;
+    font-size: .95rem;
+    color: var(--blue);
+  }
+  .seats { display: grid; gap: .3rem; }
+  .seat {
+    padding: .38rem .2rem;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--surface);
+    text-align: center;
+    font-family: "IBM Plex Mono", Consolas, monospace;
+    font-size: .74rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .seat.is-first { border-color: var(--green); background: var(--green-soft); color: var(--green); }
+
+  .deskrow { display: grid; gap: .55rem; margin-top: .6rem; }
+  .desk, .board, .door {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: .5rem .6rem;
+    border-radius: 9px;
+    font-family: "IBM Plex Mono", Consolas, monospace;
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .08em;
+    line-height: 1.3;
+  }
+  .desk { border: 1px solid var(--orange); background: var(--orange-soft); color: var(--orange); }
+  .board { border: 1px solid var(--blue); background: var(--blue-soft); color: var(--blue); }
+  .door { border: 1px dashed var(--green); background: var(--green-soft); color: var(--green); }
+  .wall { min-width: 2.6rem; writing-mode: vertical-rl; }
+  .wall.wall--left { transform: rotate(180deg); }
+
+  .frontrow { display: flex; gap: .55rem; margin-bottom: .8rem; }
+  .frontrow > * { flex: 1; }
+  .rows-h { display: grid; gap: .5rem; }
+  .rowline { display: flex; align-items: center; gap: .5rem; }
+  .row-label {
+    flex: 0 0 4.2rem;
+    font-family: "Fraunces", Georgia, serif;
+    font-size: .92rem;
+    color: var(--blue);
+  }
+  .seats-h { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: .3rem; flex: 1; min-width: 0; }
+  .aisle {
+    flex: 0 0 2rem;
+    text-align: center;
+    font-size: .6rem;
+    letter-spacing: .06em;
+    color: var(--muted);
+  }
+
+  @media (max-width: 720px) {
+    .seat { font-size: .62rem; padding: .3rem .1rem; }
+    .col-label { font-size: .8rem; }
+    .row-label { flex-basis: 3rem; font-size: .76rem; }
+    .wall { min-width: 2rem; font-size: .64rem; }
+    .aisle { flex-basis: 1rem; font-size: 0; }
+  }
+  @media print {
+    .topbar, .lede, .legend { display: none; }
+    body { background: #fff; }
+    .room-card { break-inside: avoid; box-shadow: none; margin-bottom: 1.2rem; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <span class="brand">Thống kê lỗi phòng máy</span>
+    <a class="back-link" href="ghi-loi-may.html">Ghi lỗi máy tính</a>
+  </div>
+</header>
+
+<main class="page">
+  <span class="eyebrow">PHÒNG THỰC HÀNH TIN HỌC</span>
+  <h1>Sơ đồ phòng máy tính</h1>
+  <p class="lede">Vị trí các dãy máy, bảng và bàn giáo viên của năm phòng thực hành. Máy được đánh số liên tục theo dãy: dãy 1 bắt đầu từ máy 01, hết dãy 1 mới sang dãy 2. Số máy mỗi dãy và chiều đánh số ghi rõ ở phần mô tả từng phòng. Phòng máy 1 đến 4 có một số máy hỏng nên hai máy đầu mỗi dãy (tô xanh) là chỗ ngồi chung cho hai học sinh; riêng phòng LAB mỗi bạn một máy.</p>
+
+  <div class="legend">
+    <span><span class="swatch swatch--seat"></span>Máy học sinh</span>
+    <span><span class="swatch swatch--first"></span>Máy ngồi chung (hai máy đầu mỗi dãy)</span>
+    <span><span class="swatch swatch--board"></span>Bảng</span>
+    <span><span class="swatch swatch--desk"></span>Bàn giáo viên</span>
+    <span><span class="swatch swatch--door"></span>Cửa ra vào</span>
+    <span><b>Số máy mỗi dãy ghi ở từng phòng</b></span>
+  </div>
+
+  <div id="rooms"></div>
+</main>
+
+<script src="data/phong-may.js?v=5"></script>
+<script>
+(function () {
+  "use strict";
+
+  var DEFAULT_SEATS_PER_ROW = 10;
+
+  function seatsPerRow(room) {
+    return room.seatsPerRow || DEFAULT_SEATS_PER_ROW;
+  }
+
+  var ROOMS = window.PHONG_MAY.rooms;
+
+
+  function pad(number) {
+    return number < 10 ? "0" + number : String(number);
+  }
+
+  function seatElement(room, seatId, position) {
+    var seat = document.createElement("div");
+    // Bốn phòng có máy hỏng nên hai máy đầu mỗi dãy là chỗ ngồi chung; phòng LAB thì không.
+    var shared = room.sharedSeats !== false && position <= 2;
+    seat.className = shared ? "seat is-first" : "seat";
+    seat.textContent = pad(seatId);
+    if (shared) seat.title = "Máy ngồi chung";
+    return seat;
+  }
+
+  var BLOCK_CLASS = { board: "board", door: "door", desk: "desk" };
+
+  function blockElement(kind, label) {
+    var block = document.createElement("div");
+    block.className = BLOCK_CLASS[kind] || "desk";
+    block.textContent = label;
+    return block;
+  }
+
+  function wallElement(wall, side) {
+    var element = document.createElement("div");
+    element.className = (wall.kind === "door" ? "door" : "board") + " wall wall--" + side;
+    element.textContent = wall.label;
+    return element;
+  }
+
+  function renderVertical(room) {
+    var wrapper = document.createElement("div");
+    wrapper.className = "room";
+
+    if (room.wall && room.wall.side === "left") {
+      wrapper.appendChild(wallElement(room.wall, "left"));
+    }
+
+    var floor = document.createElement("div");
+    floor.className = "floor";
+
+    var cols = document.createElement("div");
+    cols.className = "cols";
+    cols.style.gridTemplateColumns = "repeat(" + room.columns.length + ", minmax(0, 1fr))";
+
+    room.columns.forEach(function (rowNumber) {
+      var col = document.createElement("div");
+      col.className = "col";
+
+      var label = document.createElement("p");
+      label.className = "col-label";
+      label.textContent = "Dãy " + rowNumber;
+      col.appendChild(label);
+
+      var seats = document.createElement("div");
+      seats.className = "seats";
+      var perRow = seatsPerRow(room);
+      for (var index = 1; index <= perRow; index += 1) {
+        // numberFrom "bottom": máy số 1 nằm ở cuối phòng nên vẽ từ máy cuối xuống máy 1.
+        var position = room.numberFrom === "bottom" ? perRow + 1 - index : index;
+        seats.appendChild(seatElement(room, (rowNumber - 1) * perRow + position, position));
+      }
+      col.appendChild(seats);
+      cols.appendChild(col);
+    });
+    floor.appendChild(cols);
+
+    if (room.deskRow) {
+      var deskRow = document.createElement("div");
+      deskRow.className = "deskrow";
+      deskRow.style.gridTemplateColumns = "repeat(" + room.columns.length + ", minmax(0, 1fr))";
+      room.deskRow.forEach(function (item) {
+        var block = blockElement(item.kind, item.label);
+        block.style.gridColumn = item.column + " / span " + item.span;
+        deskRow.appendChild(block);
+      });
+      floor.appendChild(deskRow);
+    }
+
+    wrapper.appendChild(floor);
+
+    if (room.wall && room.wall.side === "right") {
+      wrapper.appendChild(wallElement(room.wall, "right"));
+    }
+    return wrapper;
+  }
+
+  function renderHorizontal(room) {
+    var wrapper = document.createElement("div");
+    wrapper.className = "room";
+
+    var floor = document.createElement("div");
+    floor.className = "floor";
+
+    var front = document.createElement("div");
+    front.className = "frontrow";
+    front.appendChild(blockElement("desk", "BÀN GV"));
+    front.appendChild(blockElement("board", "BẢNG"));
+    floor.appendChild(front);
+
+    var rows = document.createElement("div");
+    rows.className = "rows-h";
+
+    room.rows.forEach(function (rowNumber) {
+      var line = document.createElement("div");
+      line.className = "rowline";
+
+      var label = document.createElement("span");
+      label.className = "row-label";
+      label.textContent = "Dãy " + rowNumber;
+      line.appendChild(label);
+
+      var left = document.createElement("div");
+      left.className = "seats-h";
+      var right = document.createElement("div");
+      right.className = "seats-h";
+
+      var perRow = seatsPerRow(room);
+      for (var position = 1; position <= perRow; position += 1) {
+        var seat = seatElement(room, (rowNumber - 1) * perRow + position, position);
+        (position <= perRow / 2 ? left : right).appendChild(seat);
+      }
+
+      var aisle = document.createElement("span");
+      aisle.className = "aisle";
+      aisle.textContent = "lối đi";
+
+      line.appendChild(left);
+      line.appendChild(aisle);
+      line.appendChild(right);
+      rows.appendChild(line);
+    });
+
+    floor.appendChild(rows);
+    wrapper.appendChild(floor);
+    return wrapper;
+  }
+
+  var container = document.getElementById("rooms");
+
+  ROOMS.forEach(function (room) {
+    var rowCount = room.layout === "vertical" ? room.columns.length : room.rows.length;
+
+    var card = document.createElement("section");
+    card.className = "room-card";
+    card.id = room.id.toLowerCase();
+
+    var head = document.createElement("div");
+    head.className = "room-head";
+
+    var title = document.createElement("h2");
+    title.textContent = room.alias ? room.name + " — " + room.alias : room.name;
+
+    var meta = document.createElement("span");
+    meta.className = "room-meta";
+    meta.textContent = rowCount * seatsPerRow(room) + " MÁY · " + rowCount + " DÃY";
+
+    head.appendChild(title);
+    head.appendChild(meta);
+    card.appendChild(head);
+
+    var note = document.createElement("p");
+    note.className = "room-note";
+    note.textContent = room.note;
+    card.appendChild(note);
+
+    if (room.location) {
+      var location = document.createElement("p");
+      location.className = "room-location";
+      location.textContent = "📍 " + room.location;
+      card.appendChild(location);
+    }
+
+    card.appendChild(room.layout === "vertical" ? renderVertical(room) : renderHorizontal(room));
+    container.appendChild(card);
+  });
+})();
+</script>
+
+</body>
+</html>
