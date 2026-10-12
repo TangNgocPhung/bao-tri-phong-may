@@ -186,7 +186,8 @@
   .warn { margin-top: 0; }
   .grid > *, .stat-cols > *, .kpis > * { min-width: 0; }
   .photo-controls { display: flex; flex-wrap: wrap; gap: .6rem; }
-  .photo-preview { display: flex; align-items: center; gap: .8rem; }
+  .photo-preview { display: flex; flex-wrap: wrap; align-items: start; gap: .8rem; }
+  .photo-item { display: grid; gap: .4rem; width: 120px; }
   .photo-preview img { width: 120px; height: 90px; object-fit: contain; background: var(--surface-2); border-radius: 8px; }
   .photo-status { color: var(--muted); font-size: .82rem; overflow-wrap: anywhere; }
   @media (max-width: 600px) {
@@ -264,17 +265,14 @@
         <label>Lỗi bị hư
           <textarea id="loi" maxlength="500" placeholder="Ví dụ: không lên nguồn, hỏng bàn phím, mất kết nối mạng…" required></textarea>
         </label>
-        <label>Ảnh máy tính bị hư (không bắt buộc)
-          <input id="hinh-anh" type="file" accept="image/*">
+        <label>Ảnh máy tính bị hư (tối đa 3 ảnh, không bắt buộc)
+          <input id="hinh-anh" type="file" accept="image/*" multiple>
         </label>
         <div class="photo-controls">
           <button class="mini" id="chup-anh" type="button">Chụp ảnh</button>
           <input id="camera" type="file" accept="image/*" capture="environment" hidden>
         </div>
-        <div class="photo-preview" id="photo-preview" hidden>
-          <img id="photo-image" alt="Ảnh máy tính bị hư đã chọn">
-          <button class="mini mini--del" id="bo-anh" type="button">Bỏ ảnh</button>
-        </div>
+        <div class="photo-preview" id="photo-preview" hidden></div>
         <p class="photo-status" id="photo-status" role="status" aria-live="polite"></p>
         <p class="msg" id="form-msg" hidden></p>
         <button class="btn" id="submit" type="submit">Ghi lỗi</button>
@@ -340,34 +338,64 @@
   var $ = function (id) { return document.getElementById(id); };
   var session = null; // { token, hoTen }
   var items = [];
-  var photo = null;
-  var previewUrl = "";
+  var photos = [];
   var supportsImages = false;
+  var maxImages = 1;
+
+  function renderPhotos() {
+    var container = $("photo-preview");
+    container.innerHTML = "";
+    container.hidden = !photos.length;
+    photos.forEach(function (entry, index) {
+      var item = document.createElement("div");
+      item.className = "photo-item";
+      var img = document.createElement("img");
+      img.src = entry.url;
+      img.alt = "Ảnh máy hư " + (index + 1) + ": " + entry.file.name;
+      var remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "mini mini--del";
+      remove.textContent = "Bỏ ảnh " + (index + 1);
+      remove.disabled = $("submit").disabled;
+      remove.addEventListener("click", function () {
+        URL.revokeObjectURL(entry.url);
+        photos.splice(index, 1);
+        renderPhotos();
+      });
+      item.appendChild(img);
+      item.appendChild(remove);
+      container.appendChild(item);
+    });
+    $("photo-status").textContent = photos.length ? "Đã chọn " + photos.length + "/3 ảnh." : "";
+  }
+
+  function disablePhotos(disabled) {
+    ["hinh-anh", "camera", "chup-anh"].forEach(function (id) { $(id).disabled = disabled; });
+    $("photo-preview").querySelectorAll("button").forEach(function (button) { button.disabled = disabled; });
+  }
 
   function clearPhoto() {
-    photo = null;
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    previewUrl = "";
+    photos.forEach(function (entry) { URL.revokeObjectURL(entry.url); });
+    photos = [];
     $("hinh-anh").value = "";
     $("camera").value = "";
-    $("photo-image").removeAttribute("src");
-    $("photo-preview").hidden = true;
-    $("photo-status").textContent = "";
+    renderPhotos();
   }
 
   function selectPhoto(event) {
-    var file = event.target.files[0];
-    if (!file) return;
-    clearPhoto();
-    if (!file.type.startsWith("image/") || file.size > 20 * 1024 * 1024) {
-      $("photo-status").textContent = "Hãy chọn ảnh có dung lượng tối đa 20 MB.";
+    var files = Array.from(event.target.files);
+    event.target.value = "";
+    if (!files.length) return;
+    if (photos.length + files.length > 3) {
+      $("photo-status").textContent = "Chỉ gửi tối đa 3 ảnh. Hãy bỏ bớt ảnh hoặc chọn ít ảnh hơn.";
       return;
     }
-    photo = file;
-    previewUrl = URL.createObjectURL(file);
-    $("photo-image").src = previewUrl;
-    $("photo-preview").hidden = false;
-    $("photo-status").textContent = file.name;
+    if (files.some(function (file) { return !file.type.startsWith("image/") || file.size > 20 * 1024 * 1024; })) {
+      $("photo-status").textContent = "Hãy chọn ảnh có dung lượng tối đa 20 MB mỗi ảnh.";
+      return;
+    }
+    files.forEach(function (file) { photos.push({ file: file, url: URL.createObjectURL(file) }); });
+    renderPhotos();
   }
 
   function preparePhoto(file) {
@@ -478,16 +506,18 @@
         var td = document.createElement("td");
         if (i === 0 || i === 2) td.className = "mono";
         td.textContent = text; // textContent: không chèn HTML từ dữ liệu người dùng
-        if (i === 3 && /^https:\/\/drive\.google\.com\//.test(it.hinhAnh || "")) {
+        var links = Array.isArray(it.hinhAnhs) ? it.hinhAnhs : (it.hinhAnh ? [it.hinhAnh] : []);
+        if (i === 3) links.forEach(function (url, index) {
+          if (typeof url !== "string" || !/^https:\/\/drive\.google\.com\//.test(url)) return;
           var link = document.createElement("a");
-          link.href = it.hinhAnh;
+          link.href = url;
           link.target = "_blank";
           link.rel = "noopener noreferrer";
-          link.textContent = "Xem ảnh máy hư";
+          link.textContent = "Xem ảnh máy hư" + (links.length > 1 ? " " + (index + 1) : "");
           link.className = "by";
           link.style.display = "block";
           td.appendChild(link);
-        }
+        });
         tr.appendChild(td);
       });
 
@@ -613,6 +643,7 @@
       if (!res.ok) { $("bang").hidden = true; $("bang-empty").textContent = res.error; return; }
       items = res.items;
       supportsImages = res.supportsImages === true;
+      maxImages = res.maxImages || 1;
       renderStats();
       renderTable();
     });
@@ -661,12 +692,12 @@
   $("loi-form").addEventListener("submit", function (event) {
     event.preventDefault();
     var button = $("submit");
-    if (photo && !supportsImages) {
-      show($("form-msg"), "Máy chủ chưa hỗ trợ ảnh hoặc chưa tải xong dữ liệu. Hãy tải lại trang sau khi cập nhật Apps Script.", "msg--err");
+    if (photos.length && (!supportsImages || photos.length > maxImages)) {
+      show($("form-msg"), "Máy chủ chưa hỗ trợ số ảnh đã chọn hoặc chưa tải xong dữ liệu. Hãy cập nhật Apps Script bản tối đa 3 ảnh rồi tải lại trang.", "msg--err");
       return;
     }
     button.disabled = true;
-    ["hinh-anh", "camera", "chup-anh", "bo-anh"].forEach(function (id) { $(id).disabled = true; });
+    disablePhotos(true);
     show($("form-msg"), "");
     var payload = {
       action: "submit",
@@ -677,8 +708,14 @@
       ngay: $("ngay").value,
       giaoVien: $("giao-vien").value
     };
-    preparePhoto(photo).then(function (image) {
-      payload.hinhAnh = image;
+    var images = [];
+    // Nén lần lượt để giảm bộ nhớ trên điện thoại.
+    photos.reduce(function (chain, entry) {
+      return chain.then(function () { return preparePhoto(entry.file); })
+        .then(function (image) { images.push(image); });
+    }, Promise.resolve()).then(function () {
+      if (images.length === 1) payload.hinhAnh = images[0];
+      else if (images.length) payload.hinhAnhs = images;
       return api(payload);
     }).then(function (res) {
       if (res.expired) return logout(true);
@@ -691,14 +728,13 @@
       show($("form-msg"), err.message, "msg--err");
     }).finally(function () {
       button.disabled = false;
-      ["hinh-anh", "camera", "chup-anh", "bo-anh"].forEach(function (id) { $(id).disabled = false; });
+      disablePhotos(false);
     });
   });
 
   $("hinh-anh").addEventListener("change", selectPhoto);
   $("camera").addEventListener("change", selectPhoto);
   $("chup-anh").addEventListener("click", function () { $("camera").click(); });
-  $("bo-anh").addEventListener("click", clearPhoto);
 
   $("phong").addEventListener("change", fillSeats);
   $("loc-phong").addEventListener("change", renderTable);

@@ -178,13 +178,19 @@ function ghiLoi_(req) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_LOI);
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
-  var file = null;
+  var files = [];
   try {
+    var images = req.hinhAnhs === undefined ? (req.hinhAnh ? [req.hinhAnh] : []) : req.hinhAnhs;
+    if (!Array.isArray(images) || images.length > 3 || images.some(function (image) { return !image; })) {
+      throw new Error("Chỉ gửi tối đa 3 ảnh cho mỗi lỗi máy.");
+    }
     chuanHoaSheet_(sheet);
-    file = luuAnh_(req.hinhAnh, phong, may);
-    sheet.appendRow([new Date(), phong, may, antoan_(loi), ngay, giaoVien, user.taiKhoan, Utilities.getUuid(), TT_CHUA, "", file ? file.getUrl() : ""]);
+    images.forEach(function (image) { files.push(luuAnh_(image, phong, may)); });
+    var urls = files.map(function (file) { return file.getUrl(); });
+    var savedImages = urls.length > 1 ? JSON.stringify(urls) : (urls[0] || "");
+    sheet.appendRow([new Date(), phong, may, antoan_(loi), ngay, giaoVien, user.taiKhoan, Utilities.getUuid(), TT_CHUA, "", savedImages]);
   } catch (err) {
-    if (file) file.setTrashed(true);
+    files.forEach(function (file) { try { file.setTrashed(true); } catch (cleanupError) { /* giữ lỗi gốc */ } });
     throw err;
   } finally {
     lock.releaseLock();
@@ -214,6 +220,16 @@ function timDong_(sheet, id) {
   return cell && cell.getRow() > 1 ? cell.getRow() : null;
 }
 
+function docAnh_(value) {
+  var text = String(value || "");
+  if (!text) return [];
+  try {
+    var urls = JSON.parse(text);
+    if (Array.isArray(urls)) return urls.filter(function (url) { return typeof url === "string"; });
+  } catch (err) { /* đường dẫn một ảnh từ dữ liệu cũ */ }
+  return [text];
+}
+
 function layDanhSach_(req) {
   var user = nguoiDung_(req.token);
   if (!user) return { ok: false, error: "Phiên đăng nhập đã hết hạn, hãy đăng nhập lại.", expired: true };
@@ -234,13 +250,14 @@ function layDanhSach_(req) {
       loi: rows[i][3],
       ngay: String(ngay),
       giaoVien: rows[i][5],
-      hinhAnh: String(rows[i][10] || ""),
+      hinhAnh: docAnh_(rows[i][10])[0] || "",
+      hinhAnhs: docAnh_(rows[i][10]),
       xong: rows[i][8] === TT_XONG,
       nguoiXong: rows[i][8] === TT_XONG ? String(rows[i][9] || "") : "",
       coQuyenXoa: user.admin || rows[i][6] === user.taiKhoan
     });
   }
-  return { ok: true, items: items, supportsImages: true };
+  return { ok: true, items: items, supportsImages: true, maxImages: 3 };
 }
 
 function doiTrangThai_(req) {
