@@ -30,7 +30,7 @@ var GIAO_VIEN = [
   "Nguyễn Thị Kim Ngân",
   "Võ Thị Châu Tiền",
   "Cao Hoàng Thiên Ý",
-  "Nguyễn Thị Kim Phung",
+  "Nguyễn Thị Kim Phụng",
   "Tăng Ngọc Phụng",
   "Nguyễn Thanh Hiền"
 ];
@@ -44,9 +44,49 @@ function taoSheetMau() {
   }
   var loi = ss.getSheetByName(SHEET_LOI) || ss.insertSheet(SHEET_LOI);
   if (loi.getLastRow() === 0) {
-    loi.appendRow(["thoiGianGhi", "phong", "may", "loi", "ngay", "giaoVien", "taiKhoan", "id", "trangThai", "nguoiXuLy"]);
+    loi.appendRow(["thoiGianGhi", "phong", "may", "loi", "ngay", "giaoVien", "taiKhoan", "id", "trangThai", "nguoiXuLy", "hinhAnh"]);
     loi.getRange("E:E").setNumberFormat("@"); // giữ ngày dạng yyyy-mm-dd
   }
+  chuanHoaSheet_(loi);
+}
+
+// Chạy một lần sau khi cập nhật để tạo cột ảnh và sửa tên cũ.
+function capNhatAnhMayHu() {
+  taoSheetMau();
+  thuMucAnh_();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  [ [SHEET_GV, 3], [SHEET_LOI, 6] ].forEach(function (entry) {
+    var sheet = ss.getSheetByName(entry[0]);
+    if (sheet.getLastRow() < 2) return;
+    sheet.getRange(2, entry[1], sheet.getLastRow() - 1, 1)
+      .createTextFinder("Nguyễn Thị Kim Phung").matchEntireCell(true)
+      .replaceAllWith("Nguyễn Thị Kim Phụng");
+  });
+}
+
+function thuMucAnh_() {
+  var props = PropertiesService.getScriptProperties();
+  var id = props.getProperty("THU_MUC_ANH_MAY_HU");
+  if (id) return DriveApp.getFolderById(id);
+  var folder = DriveApp.createFolder("Ảnh máy tính bị hư - " + SpreadsheetApp.getActiveSpreadsheet().getName());
+  props.setProperty("THU_MUC_ANH_MAY_HU", folder.getId());
+  return folder;
+}
+
+function luuAnh_(image, phong, may) {
+  if (!image) return null;
+  if (image.mimeType !== "image/jpeg" || typeof image.data !== "string" ||
+      !image.data || image.data.length > Math.ceil(4 * 1024 * 1024 / 3) * 4 ||
+      !/^[A-Za-z0-9+/]+={0,2}$/.test(image.data)) {
+    throw new Error("Ảnh phải ở định dạng JPEG, tối đa 4 MB.");
+  }
+  var bytes = Utilities.base64Decode(image.data);
+  if (bytes.length > 4 * 1024 * 1024 || bytes.length < 3 ||
+      (bytes[0] & 255) !== 255 || (bytes[1] & 255) !== 216 || (bytes[2] & 255) !== 255) {
+    throw new Error("Dữ liệu ảnh không hợp lệ.");
+  }
+  var name = phong + "-may-" + may + "-" + Utilities.getUuid() + ".jpg";
+  return thuMucAnh_().createFile(Utilities.newBlob(bytes, "image/jpeg", name));
 }
 
 // Dùng trong trình soạn thảo: bamMatKhau("abc123") rồi xem nhật ký để lấy chuỗi dán vào sheet.
@@ -97,7 +137,7 @@ function dangNhap_(req) {
       var token = Utilities.getUuid();
       var user = {
         taiKhoan: tk,
-        hoTen: String(rows[i][2] || tk),
+        hoTen: String(rows[i][2] || tk).replace(/^Nguyễn Thị Kim Phung$/, "Nguyễn Thị Kim Phụng"),
         admin: String(rows[i][3] || "").trim().toLowerCase() === "admin"
       };
       CacheService.getScriptCache().put("t_" + token, JSON.stringify(user), TOKEN_TTL);
@@ -138,8 +178,14 @@ function ghiLoi_(req) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_LOI);
   var lock = LockService.getScriptLock();
   lock.waitLock(10000);
+  var file = null;
   try {
-    sheet.appendRow([new Date(), phong, may, antoan_(loi), ngay, giaoVien, user.taiKhoan, Utilities.getUuid(), TT_CHUA]);
+    chuanHoaSheet_(sheet);
+    file = luuAnh_(req.hinhAnh, phong, may);
+    sheet.appendRow([new Date(), phong, may, antoan_(loi), ngay, giaoVien, user.taiKhoan, Utilities.getUuid(), TT_CHUA, "", file ? file.getUrl() : ""]);
+  } catch (err) {
+    if (file) file.setTrashed(true);
+    throw err;
   } finally {
     lock.releaseLock();
   }
@@ -150,7 +196,7 @@ function ghiLoi_(req) {
 function chuanHoaSheet_(sheet) {
   var last = sheet.getLastRow();
   if (last < 1) return;
-  sheet.getRange("H1:J1").setValues([["id", "trangThai", "nguoiXuLy"]]);
+  sheet.getRange("H1:K1").setValues([["id", "trangThai", "nguoiXuLy", "hinhAnh"]]);
   if (last < 2) return;
   var range = sheet.getRange(2, 8, last - 1, 2);
   var values = range.getValues();
@@ -188,12 +234,13 @@ function layDanhSach_(req) {
       loi: rows[i][3],
       ngay: String(ngay),
       giaoVien: rows[i][5],
+      hinhAnh: String(rows[i][10] || ""),
       xong: rows[i][8] === TT_XONG,
       nguoiXong: rows[i][8] === TT_XONG ? String(rows[i][9] || "") : "",
       coQuyenXoa: user.admin || rows[i][6] === user.taiKhoan
     });
   }
-  return { ok: true, items: items };
+  return { ok: true, items: items, supportsImages: true };
 }
 
 function doiTrangThai_(req) {
