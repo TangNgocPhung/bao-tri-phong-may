@@ -19,7 +19,7 @@
     const moduleScript=doc.querySelector('script[type="module"]');
     if(!moduleScript) throw new Error('Không tìm thấy mã nhận dạng trong ứng dụng.');
     const source=moduleScript.textContent;
-    const pattern=/function pixelDarkness\(image,map,x,y,radius\)\{[\\s\\S]*?(?=function classify\(scores,options,threshold=\.24\)\{)/;
+    const pattern=/function pixelDarkness\(image,map,x,y,radius\)\{[\s\S]*?(?=function classify\(scores,options,threshold=\.24\)\{)/;
     if(!pattern.test(source)) throw new Error('Không tìm thấy hàm nhận dạng để cập nhật.');
     moduleScript.textContent=source.replace(pattern,`function pixelDarkness(image,map,x,y,radius){
  let inner=0,outer=0,ni=0,no=0;
@@ -46,7 +46,10 @@
  return Math.max(darkness,colorScore);
 }
 `);
-    frame.srcdoc='<!doctype html><html><head><meta charset="utf-8"><base href="./"></head><body>'+doc.documentElement.innerHTML+'</body></html>';
+    const base=doc.createElement('base');
+    base.href=new URL('./',location.href).href;
+    doc.head.prepend(base);
+    frame.srcdoc='<!doctype html>'+doc.documentElement.outerHTML;
   }catch(error){
     document.body.innerHTML='<main style="font:16px Segoe UI,Arial,sans-serif;padding:32px;color:#8b1e1e"><h2>Không mở được trang chấm bài</h2><p></p><a href="./Cham_trac_nghiem.html">Mở bản gốc</a></main>';
     document.querySelector('main p').textContent=error.message;
