@@ -21,7 +21,9 @@ body.grading-locked> :not(#grading-login):not(script){display:none!important}
 #grading-login-form label{font-weight:600}
 .lookup{margin-top:28px;padding-top:24px;border-top:1px solid #d7e2da}
 .lookup h2{font-size:20px;margin:0 0 6px}
-.lookup form{display:flex;gap:8px;margin-top:12px}
+.lookup form{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.lookup #lookup-name{flex:1 1 100%}
+.lookup #lookup-class{flex:1 1 120px}
 .lookup input{flex:1;min-width:0;padding:12px;border:1px solid #bdcec2;border-radius:9px;font:inherit}
 .lookup-msg{margin:10px 0 0;color:#a33}
 .lookup-card{margin-top:12px;padding:14px;border:1px solid #d7e2da;border-radius:12px;background:#f7faf8}
@@ -40,7 +42,7 @@ body.grading-locked> :not(#grading-login):not(script){display:none!important}
 .class-group td{background:#eef5f0;color:#155e50;font-size:13px;padding:9px 18px}#class-filter{max-width:200px}
 </style></head>
 <body class="grading-locked">
-<section id="grading-login" class="grading-login" aria-labelledby="grading-login-title"><div class="grading-login-card"><div class="grading-login-mark">✓</div><p class="eyebrow">KHÔNG GIAN GIÁO VIÊN</p><h1 id="grading-login-title">Chấm trắc nghiệm</h1><p>Đăng nhập bằng tài khoản Bảo trì phòng máy.</p><form id="grading-login-form"><label for="grading-username">Tài khoản</label><input id="grading-username" name="username" autocomplete="username" required maxlength="120" autofocus><label for="grading-password">Mật khẩu</label><input id="grading-password" name="password" type="password" autocomplete="current-password" required><label class="grading-show"><input id="grading-show-password" type="checkbox"> Hiện mật khẩu</label><button id="grading-login-submit" type="submit" class="btn primary">Đăng nhập</button></form><p id="grading-login-message" role="alert" aria-live="polite"></p><small>Cần Internet để đăng nhập. Nếu quên mật khẩu, liên hệ người quản lý tài khoản.</small><section class="lookup" aria-labelledby="lookup-title"><h2 id="lookup-title">Học sinh tra cứu điểm</h2><small>Không cần đăng nhập. Nhập họ và tên đầy đủ để xem điểm và bài làm của mình (chỉ xem, không sửa được).</small><form id="lookup-form"><input id="lookup-name" maxlength="80" autocomplete="off" placeholder="Vd: Nguyễn Minh Anh" aria-label="Họ và tên học sinh" required><button type="submit" id="lookup-submit" class="btn primary">Tra cứu</button></form><p id="lookup-message" class="lookup-msg" role="alert" aria-live="polite"></p><div id="lookup-results"></div></section><noscript>Bạn cần bật JavaScript để đăng nhập và chấm bài.</noscript></div></section>
+<section id="grading-login" class="grading-login" aria-labelledby="grading-login-title"><div class="grading-login-card"><div class="grading-login-mark">✓</div><p class="eyebrow">KHÔNG GIAN GIÁO VIÊN</p><h1 id="grading-login-title">Chấm trắc nghiệm</h1><p>Đăng nhập bằng tài khoản Bảo trì phòng máy.</p><form id="grading-login-form"><label for="grading-username">Tài khoản</label><input id="grading-username" name="username" autocomplete="username" required maxlength="120" autofocus><label for="grading-password">Mật khẩu</label><input id="grading-password" name="password" type="password" autocomplete="current-password" required><label class="grading-show"><input id="grading-show-password" type="checkbox"> Hiện mật khẩu</label><button id="grading-login-submit" type="submit" class="btn primary">Đăng nhập</button></form><p id="grading-login-message" role="alert" aria-live="polite"></p><small>Cần Internet để đăng nhập. Nếu quên mật khẩu, liên hệ người quản lý tài khoản.</small><section class="lookup" aria-labelledby="lookup-title"><h2 id="lookup-title">Học sinh tra cứu điểm</h2><small>Không cần đăng nhập. Nhập họ và tên đầy đủ cùng lớp để xem điểm và bài làm của mình (chỉ xem, không sửa được).</small><form id="lookup-form"><input id="lookup-name" maxlength="80" autocomplete="off" placeholder="Vd: Nguyễn Minh Anh" aria-label="Họ và tên học sinh" required><input id="lookup-class" maxlength="30" autocomplete="off" placeholder="Lớp, vd: 11A4" aria-label="Lớp" required><button type="submit" id="lookup-submit" class="btn primary">Tra cứu</button></form><p id="lookup-message" class="lookup-msg" role="alert" aria-live="polite"></p><div id="lookup-results"></div></section><noscript>Bạn cần bật JavaScript để đăng nhập và chấm bài.</noscript></div></section>
 <svg class="sprite" xmlns="http://www.w3.org/2000/svg"><defs>
 <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
 <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6M8 13h8M8 17h5"/></symbol>
@@ -193,7 +195,7 @@ async function requireLogin() {
     const btn = document.getElementById('lookup-submit');
     btn.disabled = true; lookupMsg.textContent = ''; lookupOut.innerHTML = '';
     try {
-      const r = await send({action: 'tra_cuu', ten: document.getElementById('lookup-name').value.trim()});
+      const r = await send({action: 'tra_cuu', ten: document.getElementById('lookup-name').value.trim(), lop: document.getElementById('lookup-class').value.trim()});
       if (!r.ok) { lookupMsg.textContent = r.error || 'Không tra cứu được.'; return; }
       if (!r.results.length) { lookupMsg.textContent = 'Chưa tìm thấy điểm. Kiểm tra lại họ tên hoặc hỏi giáo viên đã công bố điểm chưa.'; return; }
       lookupOut.innerHTML = r.results.map(x => {

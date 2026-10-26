@@ -475,7 +475,9 @@ function chuanTen_(text) {
 function traCuuDiem_(req) {
   var q = chuanTen_(String(req.ten || "").slice(0, 80));
   var tokens = q ? q.split(" ") : [];
-  if (q.length < 5 || tokens.length < 2) return { ok: false, error: "Hãy nhập họ và tên đầy đủ (ít nhất 2 từ)." };
+  if (q.length < 5 || tokens.length < 2) return { ok: false, error: "Hãy nhập họ và tên đầy đủ (ít nhất 2 từ) và lớp." };
+  var lop = chuanTen_(req.lop).replace(/ /g, "");
+  if (!lop) return { ok: false, error: "Hãy nhập lớp của em." };
   var found = [];
   var files = goc_().getFiles();
   while (files.hasNext() && found.length < 15) {
@@ -485,7 +487,7 @@ function traCuuDiem_(req) {
     Object.keys(data.exams || {}).forEach(function (exam) {
       data.exams[exam].records.forEach(function (r) {
         var n = " " + chuanTen_(r.name) + " ";
-        if (found.length < 15 && tokens.every(function (t) { return n.indexOf(" " + t) >= 0; })) {
+        if (found.length < 15 && chuanTen_(r.className).replace(/ /g, "") === lop && tokens.every(function (t) { return n.indexOf(" " + t) >= 0; })) {
           found.push({ exam: exam, at: data.exams[exam].at, teacher: data.exams[exam].teacher, name: r.name,
             className: r.className, sbd: r.sbd, code: r.code, score: r.score, correct: r.correct, total: r.total, detail: r.detail });
         }
