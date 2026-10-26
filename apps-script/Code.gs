@@ -433,7 +433,7 @@ function congBoDiem_(req) {
   var records = req.records.map(function (r) {
     return {
       name: String(r.name || "").slice(0, 80),
-      className: String(r.className || "").slice(0, 30),
+      className: String(r.className || "").slice(0, 30), electiveClass: String(r.electiveClass || "").slice(0, 30),
       sbd: String(r.sbd || "").slice(0, 20),
       code: String(r.code || "").slice(0, 20),
       score: Number(r.score),
@@ -487,9 +487,9 @@ function traCuuDiem_(req) {
     Object.keys(data.exams || {}).forEach(function (exam) {
       data.exams[exam].records.forEach(function (r) {
         var n = " " + chuanTen_(r.name) + " ";
-        if (found.length < 15 && chuanTen_(r.className).replace(/ /g, "") === lop && tokens.every(function (t) { return n.indexOf(" " + t) >= 0; })) {
+        if (found.length < 15 && (chuanTen_(r.className).replace(/ /g, "") === lop || chuanTen_(r.electiveClass).replace(/ /g, "") === lop) && tokens.every(function (t) { return n.indexOf(" " + t) >= 0; })) {
           found.push({ exam: exam, at: data.exams[exam].at, teacher: data.exams[exam].teacher, name: r.name,
-            className: r.className, sbd: r.sbd, code: r.code, score: r.score, correct: r.correct, total: r.total, detail: r.detail });
+            className: r.className, electiveClass: r.electiveClass || "", sbd: r.sbd, code: r.code, score: r.score, correct: r.correct, total: r.total, detail: r.detail });
         }
       });
     });
