@@ -105,6 +105,10 @@ function doPost(e) {
       case "list": out = layDanhSach_(req); break;
       case "resolve": out = doiTrangThai_(req); break;
       case "delete": out = xoaLoi_(req); break;
+      case "ws_load": out = taiPhienCham_(req); break;
+      case "ws_save": out = luuPhienCham_(req); break;
+      case "ws_image_put": out = luuAnhCham_(req); break;
+      case "ws_image_get": out = docAnhCham_(req); break;
       default: out = { ok: false, error: "Yêu cầu không hợp lệ." };
     }
   } catch (err) {
@@ -293,4 +297,91 @@ function xoaLoi_(req) {
     lock.releaseLock();
   }
   return { ok: true };
+}
+
+// ===== Lưu phiên chấm trắc nghiệm theo từng tài khoản (Google Drive) =====
+// Mỗi giáo viên có một thư mục riêng: ws.json (đáp án, danh sách lớp, kết quả) và ảnh bài làm *.jpg.
+
+function thuMucCham_(user) {
+  var props = PropertiesService.getScriptProperties();
+  var rootId = props.getProperty("THU_MUC_CHAM_BAI");
+  var root;
+  try { root = rootId ? DriveApp.getFolderById(rootId) : null; } catch (err) { root = null; }
+  if (!root) {
+    root = DriveApp.createFolder("Dữ liệu chấm trắc nghiệm - " + SpreadsheetApp.getActiveSpreadsheet().getName());
+    props.setProperty("THU_MUC_CHAM_BAI", root.getId());
+  }
+  var it = root.getFoldersByName(user.taiKhoan);
+  return it.hasNext() ? it.next() : root.createFolder(user.taiKhoan);
+}
+
+function idAnhHopLe_(id) {
+  return typeof id === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(id);
+}
+
+function timFile_(folder, name) {
+  var it = folder.getFilesByName(name);
+  return it.hasNext() ? it.next() : null;
+}
+
+function taiPhienCham_(req) {
+  var user = nguoiDung_(req.token);
+  if (!user) return { ok: false, error: "Phiên đăng nhập đã hết hạn, hãy đăng nhập lại.", expired: true };
+  var file = timFile_(thuMucCham_(user), "ws.json");
+  return { ok: true, data: file ? file.getBlob().getDataAsString("UTF-8") : null };
+}
+
+function luuPhienCham_(req) {
+  var user = nguoiDung_(req.token);
+  if (!user) return { ok: false, error: "Phiên đăng nhập đã hết hạn, hãy đăng nhập lại.", expired: true };
+  if (typeof req.data !== "string" || req.data.length > 20 * 1024 * 1024) return { ok: false, error: "Dữ liệu phiên chấm không hợp lệ." };
+  var data = JSON.parse(req.data);
+  var keep = {};
+  (data.imageIds || []).forEach(function (id) { if (idAnhHopLe_(id)) keep[id + ".jpg"] = true; });
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var folder = thuMucCham_(user);
+    var file = timFile_(folder, "ws.json");
+    if (file) file.setContent(req.data); else folder.createFile("ws.json", req.data, "application/json");
+    // Xóa ảnh không còn thuộc phiên (bài đã bị xóa).
+    var files = folder.getFiles();
+    while (files.hasNext()) {
+      var f = files.next();
+      var name = f.getName();
+      if (/\.jpg$/.test(name) && !keep[name]) f.setTrashed(true);
+    }
+  } finally {
+    lock.releaseLock();
+  }
+  return { ok: true };
+}
+
+function luuAnhCham_(req) {
+  var user = nguoiDung_(req.token);
+  if (!user) return { ok: false, error: "Phiên đăng nhập đã hết hạn, hãy đăng nhập lại.", expired: true };
+  if (!idAnhHopLe_(req.id)) return { ok: false, error: "Mã ảnh không hợp lệ." };
+  if (typeof req.data !== "string" || !req.data || req.data.length > Math.ceil(6 * 1024 * 1024 / 3) * 4 ||
+      !/^[A-Za-z0-9+/]+={0,2}$/.test(req.data)) {
+    return { ok: false, error: "Ảnh bài làm không hợp lệ hoặc quá lớn." };
+  }
+  var bytes = Utilities.base64Decode(req.data);
+  if (bytes.length < 3 || (bytes[0] & 255) !== 255 || (bytes[1] & 255) !== 216 || (bytes[2] & 255) !== 255) {
+    return { ok: false, error: "Ảnh phải là JPEG." };
+  }
+  var folder = thuMucCham_(user);
+  var name = req.id + ".jpg";
+  var old = timFile_(folder, name);
+  if (old) old.setTrashed(true);
+  folder.createFile(Utilities.newBlob(bytes, "image/jpeg", name));
+  return { ok: true };
+}
+
+function docAnhCham_(req) {
+  var user = nguoiDung_(req.token);
+  if (!user) return { ok: false, error: "Phiên đăng nhập đã hết hạn, hãy đăng nhập lại.", expired: true };
+  if (!idAnhHopLe_(req.id)) return { ok: false, error: "Mã ảnh không hợp lệ." };
+  var file = timFile_(thuMucCham_(user), req.id + ".jpg");
+  if (!file) return { ok: false, error: "Không tìm thấy ảnh." };
+  return { ok: true, data: Utilities.base64Encode(file.getBlob().getBytes()) };
 }
