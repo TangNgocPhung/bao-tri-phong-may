@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chấm trắc nghiệm</title>
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden}iframe{border:0;width:100%;height:100%}</style>
+</head>
+<body>
+<iframe title="Chấm trắc nghiệm" id="app"></iframe>
+<script>
+(async function(){
+  const frame=document.getElementById('app');
+  try{
+    const response=await fetch('./Cham_trac_nghiem.html',{cache:'no-store'});
+    if(!response.ok) throw new Error('Không tải được ứng dụng chấm bài ('+response.status+').');
+    const html=await response.text();
+    const doc=new DOMParser().parseFromString(html,'text/html');
+    const moduleScript=doc.querySelector('script[type="module"]');
+    if(!moduleScript) throw new Error('Không tìm thấy mã nhận dạng trong ứng dụng.');
+    const source=moduleScript.textContent;
+    const pattern=/function pixelDarkness\(image,map,x,y,radius\)\{[\s\S]*?(?=function classify\(scores,options,threshold=\.24\)\{)/;
+    if(!pattern.test(source)) throw new Error('Không tìm thấy hàm nhận dạng để cập nhật.');
+    moduleScript.textContent=source.replace(pattern,`function pixelDarkness(image,map,x,y,radius){
+ let inner=0,outer=0,ni=0,no=0;
+ let innerR=0,innerG=0,innerB=0,outerR=0,outerG=0,outerB=0;
+ for(let dy=-1.7;dy<=1.7;dy+=.22)
+  for(let dx=-1.7;dx<=1.7;dx+=.22){
+   const d=Math.hypot(dx,dy);
+   if(d>.58&&d<1.32||d>1.7)continue;
+   const p=map(x+dx*radius,y+dy*radius);
+   const px=Math.round(p.x),py=Math.round(p.y);
+   if(px<0||py<0||px>=image.width||py>=image.height)continue;
+   const i=(py*image.width+px)*4;
+   const r=image.data[i],g=image.data[i+1],b=image.data[i+2];
+   const lum=.2126*r+.7152*g+.0722*b;
+   if(d<.58){inner+=lum;innerR+=r;innerG+=g;innerB+=b;ni++;}
+   else{outer+=lum;outerR+=r;outerG+=g;outerB+=b;no++;}
+  }
+ if(!ni||!no)return 0;
+ const bg=outer/no;
+ const darkness=Math.max(0,Math.min(1,(bg-inner/ni)/Math.max(bg,60)));
+ const dr=outerR/no-innerR/ni,dg=outerG/no-innerG/ni,db=outerB/no-innerB/ni;
+ const colorDifference=Math.sqrt((dr*dr+dg*dg+db*db)/3);
+ const colorScore=Math.max(0,Math.min(1,colorDifference/55));
+ return Math.max(darkness,colorScore);
+}
+`);
+    const base=doc.createElement('base');
+    base.href=new URL('./',location.href).href;
+    doc.head.prepend(base);
+    frame.srcdoc='<!doctype html>'+doc.documentElement.outerHTML;
+  }catch(error){
+    document.body.innerHTML='<main style="font:16px Segoe UI,Arial,sans-serif;padding:32px;color:#8b1e1e"><h2>Không mở được trang chấm bài</h2><p></p><a href="./Cham_trac_nghiem.html">Mở bản gốc</a></main>';
+    document.querySelector('main p').textContent=error.message;
+  }
+})();
+</script>
+</body>
+</html>
