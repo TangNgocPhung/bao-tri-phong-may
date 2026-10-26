@@ -109,6 +109,10 @@ function doPost(e) {
       case "ws_save": out = luuPhienCham_(req); break;
       case "ws_image_put": out = luuAnhCham_(req); break;
       case "ws_image_get": out = docAnhCham_(req); break;
+      case "ws_publish": out = congBoDiem_(req); break;
+      case "ws_unpublish": out = goCongBo_(req); break;
+      case "ws_published": out = dsCongBo_(req); break;
+      case "tra_cuu": out = traCuuDiem_(req); break;
       default: out = { ok: false, error: "Yêu cầu không hợp lệ." };
     }
   } catch (err) {
@@ -384,4 +388,109 @@ function docAnhCham_(req) {
   var file = timFile_(thuMucCham_(user), req.id + ".jpg");
   if (!file) return { ok: false, error: "Không tìm thấy ảnh." };
   return { ok: true, data: Utilities.base64Encode(file.getBlob().getBytes()) };
+}
+
+// ===== Công bố điểm cho học sinh tự tra cứu (không cần đăng nhập, chỉ xem) =====
+// Giáo viên bấm "Công bố" mới có dữ liệu; mỗi giáo viên một file congbo-<tài khoản>.json ở thư mục gốc.
+// Chỉ lưu tên, lớp, SBD, mã đề, điểm và đáp án từng câu — không lưu ảnh bài làm.
+
+function goc_() {
+  thuMucCham_({ taiKhoan: "_" }); // đảm bảo thư mục gốc đã tạo
+  return DriveApp.getFolderById(PropertiesService.getScriptProperties().getProperty("THU_MUC_CHAM_BAI"));
+}
+
+function tenCongBo_(user) {
+  return "congbo-" + user.taiKhoan.replace(/[^a-z0-9_.-]/g, "_") + ".json";
+}
+
+function docCongBo_(file) {
+  try { return file ? JSON.parse(file.getBlob().getDataAsString("UTF-8")) : { exams: {} }; }
+  catch (err) { return { exams: {} }; }
+}
+
+function ghiCongBo_(user, mutate) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var root = goc_();
+    var name = tenCongBo_(user);
+    var file = timFile_(root, name);
+    var data = docCongBo_(file);
+    if (!data.exams) data.exams = {};
+    mutate(data);
+    var text = JSON.stringify(data);
+    if (file) file.setContent(text); else root.createFile(name, text, "application/json");
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function congBoDiem_(req) {
+  var user = nguoiDung_(req.token);
+  if (!user) return { ok: false, error: "Phiên đăng nhập đã hết hạn, hãy đăng nhập lại.", expired: true };
+  var exam = String(req.exam || "").trim().slice(0, 120);
+  if (!exam || !Array.isArray(req.records) || req.records.length > 2000) return { ok: false, error: "Dữ liệu công bố không hợp lệ." };
+  var records = req.records.map(function (r) {
+    return {
+      name: String(r.name || "").slice(0, 80),
+      className: String(r.className || "").slice(0, 30),
+      sbd: String(r.sbd || "").slice(0, 20),
+      code: String(r.code || "").slice(0, 20),
+      score: Number(r.score),
+      correct: Number(r.correct) || 0,
+      total: Number(r.total) || 0,
+      detail: (Array.isArray(r.detail) ? r.detail : []).slice(0, 250).map(function (d) {
+        return [String(d.q).slice(0, 8), String(d.selected || "").slice(0, 4), String(d.answer || "").slice(0, 4), d.correct ? 1 : 0];
+      })
+    };
+  }).filter(function (r) { return r.name && isFinite(r.score); });
+  ghiCongBo_(user, function (data) {
+    data.exams[exam] = { at: new Date().toISOString(), teacher: user.hoTen, records: records };
+  });
+  return { ok: true, count: records.length };
+}
+
+function goCongBo_(req) {
+  var user = nguoiDung_(req.token);
+  if (!user) return { ok: false, error: "Phiên đăng nhập đã hết hạn, hãy đăng nhập lại.", expired: true };
+  var exam = String(req.exam || "").trim();
+  ghiCongBo_(user, function (data) { delete data.exams[exam]; });
+  return { ok: true };
+}
+
+function dsCongBo_(req) {
+  var user = nguoiDung_(req.token);
+  if (!user) return { ok: false, error: "Phiên đăng nhập đã hết hạn, hãy đăng nhập lại.", expired: true };
+  var data = docCongBo_(timFile_(goc_(), tenCongBo_(user)));
+  return { ok: true, exams: Object.keys(data.exams || {}).map(function (k) {
+    return { exam: k, at: data.exams[k].at, count: data.exams[k].records.length };
+  }) };
+}
+
+function chuanTen_(text) {
+  return String(text || "").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D")
+    .toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function traCuuDiem_(req) {
+  var q = chuanTen_(String(req.ten || "").slice(0, 80));
+  var tokens = q ? q.split(" ") : [];
+  if (q.length < 5 || tokens.length < 2) return { ok: false, error: "Hãy nhập họ và tên đầy đủ (ít nhất 2 từ)." };
+  var found = [];
+  var files = goc_().getFiles();
+  while (files.hasNext() && found.length < 15) {
+    var file = files.next();
+    if (file.getName().indexOf("congbo-") !== 0) continue;
+    var data = docCongBo_(file);
+    Object.keys(data.exams || {}).forEach(function (exam) {
+      data.exams[exam].records.forEach(function (r) {
+        var n = " " + chuanTen_(r.name) + " ";
+        if (found.length < 15 && tokens.every(function (t) { return n.indexOf(" " + t) >= 0; })) {
+          found.push({ exam: exam, at: data.exams[exam].at, teacher: data.exams[exam].teacher, name: r.name,
+            className: r.className, sbd: r.sbd, code: r.code, score: r.score, correct: r.correct, total: r.total, detail: r.detail });
+        }
+      });
+    });
+  }
+  return { ok: true, results: found };
 }
