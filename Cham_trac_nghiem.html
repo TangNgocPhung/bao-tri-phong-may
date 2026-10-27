@@ -213,7 +213,7 @@ async function requireLogin() {
   const send = async payload => {
     const response = await fetch(GRADING_AUTH_URL, {
       method: 'POST', headers: {'Content-Type': 'text/plain;charset=UTF-8'},
-      body: JSON.stringify(payload), signal: AbortSignal.timeout(30000),
+      body: JSON.stringify(payload), signal: AbortSignal.timeout(/^ws_(unpublish|publish)/.test(payload.action) ? 120000 : 30000),
       credentials: 'omit', redirect: 'follow'
     });
     if (!response.ok) throw new Error('Không kết nối được máy chủ. Vui lòng thử lại.');
@@ -326,7 +326,7 @@ function clone(value){return JSON.parse(JSON.stringify(value));}
 
 // Lưu phiên chấm lên máy chủ (theo tài khoản) để đăng xuất / đăng nhập lại vẫn còn dữ liệu.
 const WS={ready:false,dirty:false,timer:null,chain:Promise.resolve(),saved:new WeakSet()};
-async function wsCall(payload){const r=await gradingSend({...payload,token:gradingToken});if(!r.ok)throw Object.assign(Error(r.error||'Lỗi máy chủ'),{expired:!!r.expired});return r;}
+async function wsCall(payload){let r;try{r=await gradingSend({...payload,token:gradingToken});}catch(e){if(e&&(e.name==='TimeoutError'||e.name==='AbortError'))throw Error('Máy chủ phản hồi quá chậm. Thao tác có thể đã được thực hiện, hãy bấm lại sau ít phút để kiểm tra.');throw e;}if(!r.ok)throw Object.assign(Error(r.error||'Lỗi máy chủ'),{expired:!!r.expired});return r;}
 function wsBadge(text,error=false,pct=null){const el=$('ws-status');if(el){el.textContent=text;el.classList.toggle('error',error);}const bar=$('ws-bar');if(bar){bar.hidden=pct===null;if(pct!==null)bar.firstElementChild.style.width=Math.round(pct)+'%';}}
 function wsSerialize(){return JSON.stringify({version:1,sessionId:state.sessionId||null,keys:[...state.keys],keySets:keySetsData(),roster:[...state.roster],keyFile:$('key-filename').textContent,maxScore:$('max-score').value,tfMode:$('tf-mode').value,examName:$('exam-name')?.value||'',template:state.template,hasTemplateImage:!!state.background,papers:state.papers.map(({canvas,_loading,_blob,_blobFor,...p})=>p),imageIds:[...state.papers.map(p=>p.id),'template']});}
 async function wsSaveNow(){if(!WS.ready||state.demo||!WS.dirty)return;WS.dirty=false;try{wsBadge('Đang lưu… chuẩn bị',false,2);const images=state.papers.filter(p=>p.canvas&&!WS.saved.has(p.canvas)).map(p=>[p.id,p.canvas]);if(state.background&&!WS.saved.has(state.background))images.push(['template',state.background]);let k=0;for(const [id,c] of images){wsBadge('Đang lưu ảnh '+(k+1)+'/'+images.length+' ('+Math.round(k/(images.length+1)*100)+'%)',false,k/(images.length+1)*100);await wsCall({action:'ws_image_put',id,data:c.toDataURL('image/jpeg',.8).split(',')[1]});WS.saved.add(c);k++;}wsBadge('Đang lưu kết quả chấm… ('+Math.round(images.length/(images.length+1)*100)+'%)',false,images.length/(images.length+1)*100);await wsCall({action:'ws_save',data:wsSerialize()});wsBadge('Đã lưu '+new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})+' · 100%',false,100);setTimeout(()=>{if(!WS.dirty&&$('ws-bar'))$('ws-bar').hidden=true;},2500);}catch(error){WS.dirty=true;wsBadge('Chưa lưu được',true);toast(error.expired?'Phiên đăng nhập đã hết hạn nên chưa lưu được. Hãy xuất Excel bảng điểm.':'Chưa lưu được lên máy chủ: '+error.message,true);}}

@@ -500,10 +500,12 @@ function goCongBo_(req) {
   var user = nguoiDung_(req.token);
   if (!user) return { ok: false, error: "Phiên đăng nhập đã hết hạn, hãy đăng nhập lại.", expired: true };
   var exam = String(req.exam || "").trim();
+  var cu = [];
   ghiCongBo_(user, function (data) {
-    if (data.exams[exam]) xoaAnhCongBo_(data.exams[exam].records);
+    if (data.exams[exam]) cu = data.exams[exam].records;
     delete data.exams[exam];
   });
+  xoaAnhCongBo_(cu);
   return { ok: true };
 }
 
