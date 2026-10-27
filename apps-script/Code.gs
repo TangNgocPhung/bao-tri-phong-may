@@ -109,10 +109,12 @@ function doPost(e) {
       case "ws_save": out = luuPhienCham_(req); break;
       case "ws_image_put": out = luuAnhCham_(req); break;
       case "ws_image_get": out = docAnhCham_(req); break;
+      case "ws_pub_img": out = luuAnhCongBo_(req); break;
       case "ws_publish": out = congBoDiem_(req); break;
       case "ws_unpublish": out = goCongBo_(req); break;
       case "ws_published": out = dsCongBo_(req); break;
       case "tra_cuu": out = traCuuDiem_(req); break;
+      case "tra_cuu_anh": out = docAnhCongBo_(req); break;
       default: out = { ok: false, error: "Yêu cầu không hợp lệ." };
     }
   } catch (err) {
@@ -392,7 +394,7 @@ function docAnhCham_(req) {
 
 // ===== Công bố điểm cho học sinh tự tra cứu (không cần đăng nhập, chỉ xem) =====
 // Giáo viên bấm "Công bố" mới có dữ liệu; mỗi giáo viên một file congbo-<tài khoản>.json ở thư mục gốc.
-// Chỉ lưu tên, lớp, SBD, mã đề, điểm và đáp án từng câu — không lưu ảnh bài làm.
+// Lưu tên, lớp, SBD, mã đề, điểm, đáp án từng câu và ảnh bài làm đã chấm (pub-<mã>.jpg, mã ngẫu nhiên khó đoán).
 
 function goc_() {
   thuMucCham_({ taiKhoan: "_" }); // đảm bảo thư mục gốc đã tạo
@@ -425,6 +427,46 @@ function ghiCongBo_(user, mutate) {
   }
 }
 
+function idAnhCongBo_(id) {
+  return typeof id === "string" && /^[a-z0-9]{16,40}$/.test(id);
+}
+
+function luuAnhCongBo_(req) {
+  var user = nguoiDung_(req.token);
+  if (!user) return { ok: false, error: "Phiên đăng nhập đã hết hạn, hãy đăng nhập lại.", expired: true };
+  if (!idAnhCongBo_(req.id)) return { ok: false, error: "Mã ảnh không hợp lệ." };
+  if (typeof req.data !== "string" || !req.data || req.data.length > Math.ceil(2 * 1024 * 1024 / 3) * 4 ||
+      !/^[A-Za-z0-9+/]+={0,2}$/.test(req.data)) {
+    return { ok: false, error: "Ảnh bài làm không hợp lệ hoặc quá lớn." };
+  }
+  var bytes = Utilities.base64Decode(req.data);
+  if (bytes.length < 3 || (bytes[0] & 255) !== 255 || (bytes[1] & 255) !== 216 || (bytes[2] & 255) !== 255) {
+    return { ok: false, error: "Ảnh phải là JPEG." };
+  }
+  var root = goc_();
+  var name = "pub-" + req.id + ".jpg";
+  var old = timFile_(root, name);
+  if (old) old.setTrashed(true);
+  root.createFile(Utilities.newBlob(bytes, "image/jpeg", name));
+  return { ok: true };
+}
+
+function docAnhCongBo_(req) {
+  if (!idAnhCongBo_(req.id)) return { ok: false, error: "Mã ảnh không hợp lệ." };
+  var file = timFile_(goc_(), "pub-" + req.id + ".jpg");
+  if (!file) return { ok: false, error: "Không tìm thấy ảnh." };
+  return { ok: true, data: Utilities.base64Encode(file.getBlob().getBytes()) };
+}
+
+function xoaAnhCongBo_(records) {
+  var root = goc_();
+  (records || []).forEach(function (r) {
+    if (!idAnhCongBo_(r.img)) return;
+    var f = timFile_(root, "pub-" + r.img + ".jpg");
+    if (f) f.setTrashed(true);
+  });
+}
+
 function congBoDiem_(req) {
   var user = nguoiDung_(req.token);
   if (!user) return { ok: false, error: "Phiên đăng nhập đã hết hạn, hãy đăng nhập lại.", expired: true };
@@ -436,6 +478,7 @@ function congBoDiem_(req) {
       className: String(r.className || "").slice(0, 30), electiveClass: String(r.electiveClass || "").slice(0, 30),
       sbd: String(r.sbd || "").slice(0, 20),
       code: String(r.code || "").slice(0, 20),
+      img: idAnhCongBo_(r.img) ? r.img : "",
       score: Number(r.score),
       correct: Number(r.correct) || 0,
       total: Number(r.total) || 0,
@@ -445,6 +488,9 @@ function congBoDiem_(req) {
     };
   }).filter(function (r) { return r.name && isFinite(r.score); });
   ghiCongBo_(user, function (data) {
+    if (data.exams[exam]) xoaAnhCongBo_(data.exams[exam].records.filter(function (o) {
+      return !records.some(function (r) { return r.img && r.img === o.img; });
+    }));
     data.exams[exam] = { at: new Date().toISOString(), teacher: user.hoTen, records: records };
   });
   return { ok: true, count: records.length };
@@ -454,7 +500,10 @@ function goCongBo_(req) {
   var user = nguoiDung_(req.token);
   if (!user) return { ok: false, error: "Phiên đăng nhập đã hết hạn, hãy đăng nhập lại.", expired: true };
   var exam = String(req.exam || "").trim();
-  ghiCongBo_(user, function (data) { delete data.exams[exam]; });
+  ghiCongBo_(user, function (data) {
+    if (data.exams[exam]) xoaAnhCongBo_(data.exams[exam].records);
+    delete data.exams[exam];
+  });
   return { ok: true };
 }
 
@@ -489,7 +538,7 @@ function traCuuDiem_(req) {
         var n = " " + chuanTen_(r.name) + " ";
         if (found.length < 15 && (chuanTen_(r.className).replace(/ /g, "") === lop || chuanTen_(r.electiveClass).replace(/ /g, "") === lop) && tokens.every(function (t) { return n.indexOf(" " + t) >= 0; })) {
           found.push({ exam: exam, at: data.exams[exam].at, teacher: data.exams[exam].teacher, name: r.name,
-            className: r.className, electiveClass: r.electiveClass || "", sbd: r.sbd, code: r.code, score: r.score, correct: r.correct, total: r.total, detail: r.detail });
+            className: r.className, electiveClass: r.electiveClass || "", sbd: r.sbd, code: r.code, img: r.img || "", score: r.score, correct: r.correct, total: r.total, detail: r.detail });
         }
       });
     });
