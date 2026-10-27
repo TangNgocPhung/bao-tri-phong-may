@@ -19,7 +19,7 @@
     const moduleScript=doc.querySelector('script[type="module"]');
     if(!moduleScript) throw new Error('Không tìm thấy mã nhận dạng trong ứng dụng.');
     const source=moduleScript.textContent;
-    const pattern=/function pixelDarkness\(image,map,x,y,radius\)\{[\s\S]*?(?=function classify\(scores,options,threshold=\.24\)\{)/;
+    const pattern=/function pixelDarkness\(image,map,x,y,radius\)\{[\s\S]*?(?=\/\/ Auto-registration|function detectMarkers\(|function classify\(scores,options,threshold=\.24\)\{)/;
     if(!pattern.test(source)) throw new Error('Không tìm thấy hàm nhận dạng để cập nhật.');
     moduleScript.textContent=source.replace(pattern,`function pixelDarkness(image,map,x,y,radius){
  let inner=0,outer=0,ni=0,no=0;
