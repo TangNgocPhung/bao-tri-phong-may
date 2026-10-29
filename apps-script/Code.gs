@@ -514,7 +514,11 @@ function dsCongBo_(req) {
   if (!user) return { ok: false, error: "Phiên đăng nhập đã hết hạn, hãy đăng nhập lại.", expired: true };
   var data = docCongBo_(timFile_(goc_(), tenCongBo_(user)));
   return { ok: true, exams: Object.keys(data.exams || {}).map(function (k) {
-    return { exam: k, at: data.exams[k].at, count: data.exams[k].records.length };
+    var classes = {};
+    data.exams[k].records.forEach(function (r) {
+      [r.className, r.electiveClass].forEach(function (c) { if (c) classes[c] = (classes[c] || 0) + 1; });
+    });
+    return { exam: k, at: data.exams[k].at, count: data.exams[k].records.length, classes: classes };
   }) };
 }
 
