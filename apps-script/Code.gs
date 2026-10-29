@@ -516,7 +516,8 @@ function dsCongBo_(req) {
   return { ok: true, exams: Object.keys(data.exams || {}).map(function (k) {
     var classes = {};
     data.exams[k].records.forEach(function (r) {
-      [r.className, r.electiveClass].forEach(function (c) { if (c) classes[c] = (classes[c] || 0) + 1; });
+      var seen = {};
+      [r.className, r.electiveClass].forEach(function (c) { if (c && !seen[c]) { seen[c] = true; classes[c] = (classes[c] || 0) + 1; } });
     });
     return { exam: k, at: data.exams[k].at, count: data.exams[k].records.length, classes: classes };
   }) };
